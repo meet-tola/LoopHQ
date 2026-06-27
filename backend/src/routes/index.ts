@@ -4,6 +4,6 @@ import workspaceRoutes from "./workspace.route";
 
 const router = Router();
 router.use("/auth", authRoutes);
-router.use("/workspace", workspaceRoutes);
+router.use("/workspaces", workspaceRoutes);
 
 export default router;

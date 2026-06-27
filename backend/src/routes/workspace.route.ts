@@ -10,21 +10,60 @@ import {
     updateCustomPermissions,
     removeUser
 } from "../controllers/workspace.controller";
-import { requireAuth } from "../middlewares/auth.middleware";
+import { requireAuth, requireWorkspaceRole } from "../middlewares/auth.middleware";
+import { WorkspaceRole } from "@prisma/client";
 
 const workspaceRoutes = Router();
 
 // --- Core Workspace ---
-workspaceRoutes.post("/workspaces", requireAuth, createWorkspace);
-workspaceRoutes.get("/workspaces/:workspaceId/members", requireAuth, listWorkspaceMembers);
-workspaceRoutes.patch("/workspaces/:workspaceId/members/role", requireAuth, updateRole);
-workspaceRoutes.patch("/workspaces/:workspaceId/members/permissions", requireAuth, updateCustomPermissions);
-workspaceRoutes.delete("/workspaces/:workspaceId/members/remove", requireAuth, removeUser);
+workspaceRoutes.post("/create", requireAuth, createWorkspace);
 
-// --- Workspace Member Management & System Invites ---
-workspaceRoutes.post("/workspaces/:workspaceId/members/add", requireAuth, addMember);
-workspaceRoutes.post("/workspaces/:workspaceId/members/invite", requireAuth, sendInvite);
-workspaceRoutes.get("/workspaces/invites/verify", verifyInvite); 
-workspaceRoutes.post("/workspaces/invites/accept", requireAuth, acceptInvite);
+// Any member can view the team
+workspaceRoutes.get(
+    "/:workspaceId/members",
+    requireAuth,
+    requireWorkspaceRole(WorkspaceRole.OWNER, WorkspaceRole.ADMIN, WorkspaceRole.MEMBER),
+    listWorkspaceMembers
+);
+
+// Only Admins or Owners can modify roles, permissions, or add/invite members
+workspaceRoutes.patch(
+    "/:workspaceId/members/role",
+    requireAuth,
+    requireWorkspaceRole(WorkspaceRole.OWNER, WorkspaceRole.ADMIN),
+    updateRole
+);
+
+workspaceRoutes.patch(
+    "/:workspaceId/members/permissions",
+    requireAuth,
+    requireWorkspaceRole(WorkspaceRole.OWNER, WorkspaceRole.ADMIN),
+    updateCustomPermissions
+);
+
+workspaceRoutes.delete(
+    "/:workspaceId/members/remove",
+    requireAuth,
+    requireWorkspaceRole(WorkspaceRole.OWNER, WorkspaceRole.ADMIN),
+    removeUser
+);
+
+workspaceRoutes.post(
+    "/:workspaceId/members/add",
+    requireAuth,
+    requireWorkspaceRole(WorkspaceRole.OWNER, WorkspaceRole.ADMIN),
+    addMember
+);
+
+workspaceRoutes.post(
+    "/:workspaceId/members/invite",
+    requireAuth,
+    requireWorkspaceRole(WorkspaceRole.OWNER, WorkspaceRole.ADMIN),
+    sendInvite
+);
+
+// --- Invite Validation  ---
+workspaceRoutes.get("/invites/verify", verifyInvite);
+workspaceRoutes.post("/invites/accept", requireAuth, acceptInvite);
 
 export default workspaceRoutes;

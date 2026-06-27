@@ -1,5 +1,5 @@
-import prisma from "../utils/prisma.js";
-import logger from "../utils/logger.js";
+import prisma from "../utils/prisma";
+import logger from "../utils/logger";
 import crypto from "crypto";
 import { WorkspaceRole } from "@prisma/client";
 import { sendVerificationEmail } from "./malier";
@@ -8,14 +8,13 @@ export interface UpdateRolePayload {
   workspaceId: string;
   targetUserId: string;
   newRole: WorkspaceRole;
-  requestedByUserId: string;
+  requesterRole: WorkspaceRole;
 }
 
 export interface WorkspacePermissionsPayload {
   workspaceId: string;
   targetUserId: string;
   permissions: Record<string, any>;
-  requestedByUserId: string;
 }
 
 export interface CreateWorkspacePayload {
@@ -24,40 +23,23 @@ export interface CreateWorkspacePayload {
   userId: string;
 }
 
-// --- Add a member to workspace ---
+// --- Create workspace ---
 export const createWorkspace = async ({ name, slug, userId }: CreateWorkspacePayload) => {
   const existingSlug = await prisma.workspace.findUnique({ where: { slug } });
   if (existingSlug) throw new Error("Workspace slug is already taken");
 
   return prisma.$transaction(async (tx) => {
-    const workspace = await tx.workspace.create({
-      data: { name, slug },
-    });
-
+    const workspace = await tx.workspace.create({ data: { name, slug } });
     await tx.workspaceMember.create({
-      data: {
-        workspaceId: workspace.id,
-        userId,
-        role: WorkspaceRole.OWNER,
-      },
+      data: { workspaceId: workspace.id, userId, role: WorkspaceRole.OWNER },
     });
-
     logger.info(`Workspace '${name}' created and seeded with Owner user ${userId}`);
     return workspace;
   });
 };
 
-
 // --- Add a member to workspace ---
-export const addMemberToWorkspace = async (workspaceId: string, targetEmail: string, requestedByUserId: string) => {
-  const requester = await prisma.workspaceMember.findUnique({
-    where: { workspaceId_userId: { workspaceId, userId: requestedByUserId } },
-  });
-
-  if (!requester || (requester.role !== WorkspaceRole.OWNER && requester.role !== WorkspaceRole.ADMIN)) {
-    throw new Error("Access denied: Insufficient privileges to add members directly.");
-  }
-
+export const addMemberToWorkspace = async (workspaceId: string, targetEmail: string) => {
   const targetUser = await prisma.user.findUnique({ where: { email: targetEmail } });
   if (!targetUser) throw new Error("No user registered with this email address.");
 
@@ -67,33 +49,16 @@ export const addMemberToWorkspace = async (workspaceId: string, targetEmail: str
   if (existingMember) throw new Error("User is already a member of this workspace.");
 
   return prisma.workspaceMember.create({
-    data: {
-      workspaceId,
-      userId: targetUser.id,
-      role: WorkspaceRole.MEMBER,
-    },
-    include: {
-      user: { select: { id: true, username: true, email: true } },
-    },
+    data: { workspaceId, userId: targetUser.id, role: WorkspaceRole.MEMBER },
+    include: { user: { select: { id: true, username: true, email: true } } },
   });
 };
 
-
 // --- Send invite to member to join a workspace using link ---
 export const sendWorkspaceInvite = async (workspaceId: string, email: string, requestedByUserId: string) => {
-  const membership = await prisma.workspaceMember.findUnique({
-    where: { workspaceId_userId: { workspaceId, userId: requestedByUserId } },
-  });
-
-  if (!membership || (membership.role !== WorkspaceRole.OWNER && membership.role !== WorkspaceRole.ADMIN)) {
-    throw new Error("Access denied: Insufficient privileges to invite users.");
-  }
-
-  // Generate token 
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  // Track invitation in the database
   await prisma.workspaceInvite.upsert({
     where: { workspaceId_email: { workspaceId, email } },
     update: { token, expiresAt },
@@ -101,16 +66,11 @@ export const sendWorkspaceInvite = async (workspaceId: string, email: string, re
   });
 
   const inviteLink = `${process.env.FRONTEND_URL}/invite/accept?token=${token}`;
-
-  await sendVerificationEmail({
-    email,
-    verificationLink: inviteLink,
-  });
-
+  await sendVerificationEmail({ email, verificationLink: inviteLink });
   return { success: true };
 };
 
-// --- Verify Invite Token ---
+// --- Verify invite token ---
 export const verifyInviteToken = async (token: string) => {
   const invite = await prisma.workspaceInvite.findUnique({
     where: { token },
@@ -122,10 +82,10 @@ export const verifyInviteToken = async (token: string) => {
     await prisma.workspaceInvite.delete({ where: { token } }).catch(() => { });
     throw new Error("This invitation has expired.");
   }
-
   return invite;
-}
+};
 
+// --- Accept workspace invitation ---
 export const acceptWorkspaceInvite = async (token: string, userId: string) => {
   const invite = await verifyInviteToken(token);
   const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -152,16 +112,10 @@ export const acceptWorkspaceInvite = async (token: string, userId: string) => {
     await tx.workspaceInvite.delete({ where: { token } });
     return newMember;
   });
-}
-
+};
 
 // --- Lists all members within a given workspace ---
-export const getWorkspaceMembers = async (workspaceId: string, userId: string) => {
-  const requester = await prisma.workspaceMember.findUnique({
-    where: { workspaceId_userId: { workspaceId, userId } },
-  });
-  if (!requester) throw new Error("Access denied: Not a member of this workspace");
-
+export const getWorkspaceMembers = async (workspaceId: string) => {
   return prisma.workspaceMember.findMany({
     where: { workspaceId },
     select: {
@@ -169,33 +123,15 @@ export const getWorkspaceMembers = async (workspaceId: string, userId: string) =
       role: true,
       permissions: true,
       createdAt: true,
-      user: {
-        select: {
-          id: true,
-          email: true,
-          username: true,
-        },
-      },
+      user: { select: { id: true, email: true, username: true } },
     },
   });
 };
 
-// --- Updates a member's workspace role ---
-export const updateWorkspaceUserRole = async ({
-  workspaceId,
-  targetUserId,
-  newRole,
-  requestedByUserId,
-}: UpdateRolePayload) => {
-  const requester = await prisma.workspaceMember.findUnique({
-    where: { workspaceId_userId: { workspaceId, userId: requestedByUserId } },
-  });
 
-  if (!requester) throw new Error("Access denied: You are not a member of this workspace.");
-  if (requester.role !== WorkspaceRole.OWNER && requester.role !== WorkspaceRole.ADMIN) {
-    throw new Error("Access denied: Insufficient administrative privileges.");
-  }
-  if (newRole === WorkspaceRole.OWNER && requester.role !== WorkspaceRole.OWNER) {
+// --- Updates a member's workspace role ---
+export const updateWorkspaceUserRole = async ({ workspaceId, targetUserId, newRole, requesterRole }: UpdateRolePayload) => {
+  if (newRole === WorkspaceRole.OWNER && requesterRole !== WorkspaceRole.OWNER) {
     throw new Error("Access denied: Only workspace owners can assign the OWNER role.");
   }
 
@@ -204,34 +140,19 @@ export const updateWorkspaceUserRole = async ({
   });
 
   if (!targetMember) throw new Error("Target user is not a member of this workspace.");
-  if (targetMember.role === WorkspaceRole.OWNER && requestedByUserId !== targetUserId) {
+  if (targetMember.role === WorkspaceRole.OWNER) {
     throw new Error("Access denied: Workspace Owners cannot be downgraded.");
   }
 
   return prisma.workspaceMember.update({
     where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
     data: { role: newRole },
-    include: {
-      user: { select: { id: true, username: true, email: true } },
-    },
+    include: { user: { select: { id: true, username: true, email: true } } },
   });
 };
 
-// --- Updates Workspace user permission ---
-export const updateWorkspaceUserPermissions = async ({
-  workspaceId,
-  targetUserId,
-  permissions,
-  requestedByUserId,
-}: WorkspacePermissionsPayload) => {
-  const requester = await prisma.workspaceMember.findUnique({
-    where: { workspaceId_userId: { workspaceId, userId: requestedByUserId } },
-  });
-
-  if (!requester || (requester.role !== WorkspaceRole.OWNER && requester.role !== WorkspaceRole.ADMIN)) {
-    throw new Error("Access denied: Insufficient privileges to update fine-grained permissions.");
-  }
-
+// --- Updates workspace user permission ---
+export const updateWorkspaceUserPermissions = async ({ workspaceId, targetUserId, permissions }: WorkspacePermissionsPayload) => {
   return prisma.workspaceMember.update({
     where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
     data: { permissions },
@@ -239,28 +160,19 @@ export const updateWorkspaceUserPermissions = async ({
 };
 
 // --- Removes a user from a workspace ---
-export const removeUserFromWorkspace = async (workspaceId: string, targetUserId: string, requestedByUserId: string) => {
-  const requester = await prisma.workspaceMember.findUnique({
-    where: { workspaceId_userId: { workspaceId, userId: requestedByUserId } },
-  });
-
-  if (!requester || (requester.role !== WorkspaceRole.OWNER && requester.role !== WorkspaceRole.ADMIN)) {
-    throw new Error("Access denied: You cannot remove members from this workspace.");
-  }
-
+export const removeUserFromWorkspace = async (workspaceId: string, targetUserId: string) => {
   const targetMember = await prisma.workspaceMember.findUnique({
     where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
   });
 
   if (!targetMember) throw new Error("User is not a member of this workspace.");
   if (targetMember.role === WorkspaceRole.OWNER) {
-    throw new Error("Access denied: Workspace owners cannot be removed directly.");
+    throw new Error("Access denied: Workspace owners cannot be removed.");
   }
 
   await prisma.workspaceMember.delete({
     where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
   });
 
-  logger.warn(`User ${targetUserId} removed from workspace ${workspaceId} by ${requestedByUserId}`);
   return { success: true };
 };
