@@ -8,10 +8,10 @@ import {
 } from "../validators/auth.validator";
 import logger from "../utils/logger";
 import { HTTPSTATUS } from "../config/http.config";
-
+import { asyncHandler } from "../middlewares/asyncHandler.middleware";
 
 // --- Utility Constants & Helpers ---
-const COOKIE_NAME = "glimpse_refresh";
+const COOKIE_NAME = "loop_hq";
 
 const getCookieOptions = (): CookieOptions => ({
   httpOnly: true,
@@ -33,7 +33,7 @@ const extractBearerToken = (req: Request): string | null => {
 
 // --- All Controllers ---
 
-export const googleSignIn = async (req: Request, res: Response): Promise<Response> => {
+export const googleSignIn = asyncHandler(async (req: Request, res: Response) => {
   const parsed = googleAuthSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(HTTPSTATUS.UNAUTHORIZED).json({
@@ -59,9 +59,9 @@ export const googleSignIn = async (req: Request, res: Response): Promise<Respons
     logger.error(`googleSignIn error: ${error.message}`);
     return res.status(HTTPSTATUS.UNAUTHORIZED).json({ success: false, message: "Invalid or expired provider token" });
   }
-};
+});
 
-export const register = async (req: Request, res: Response): Promise<Response> => {
+export const register = asyncHandler(async (req: Request, res: Response) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(HTTPSTATUS.BAD_REQUEST).json({
@@ -91,9 +91,9 @@ export const register = async (req: Request, res: Response): Promise<Response> =
     logger.error(`register controller error: ${error.message}`);
     return res.status(HTTPSTATUS.INTERNAL_SERVER_ERROR).json({ success: false, message: "Registration failed" });
   }
-};
+});
 
-export const verifyEmail = async (req: Request, res: Response): Promise<Response> => {
+export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
   const { access_token } = req.body;
   if (!access_token) {
     return res.status(HTTPSTATUS.BAD_REQUEST).json({ success: false, message: "Missing access token" });
@@ -120,9 +120,9 @@ export const verifyEmail = async (req: Request, res: Response): Promise<Response
       message: error.message || "Invalid or expired verification link",
     });
   }
-};
+});
 
-export const login = async (req: Request, res: Response): Promise<Response> => {
+export const login = asyncHandler(async (req: Request, res: Response) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(HTTPSTATUS.BAD_REQUEST).json({
@@ -148,9 +148,9 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
     logger.error(`login controller error: ${error.message}`);
     return res.status(HTTPSTATUS.INTERNAL_SERVER_ERROR).json({ success: false, message: "Login failed" });
   }
-};
+});
 
-export const logout = async (req: Request, res: Response): Promise<Response> => {
+export const logout = asyncHandler(async (req: Request, res: Response) => {
   const accessToken = extractBearerToken(req);
   if (!accessToken) {
     return res.status(HTTPSTATUS.UNAUTHORIZED).json({ success: false, message: "No token provided" });
@@ -164,9 +164,9 @@ export const logout = async (req: Request, res: Response): Promise<Response> => 
     logger.error(`logout controller error: ${error.message}`);
     return res.status(HTTPSTATUS.INTERNAL_SERVER_ERROR).json({ success: false, message: "Logout failed" });
   }
-};
+});
 
-export const refresh = async (req: Request, res: Response): Promise<Response> => {
+export const refresh = asyncHandler(async (req: Request, res: Response) => {
   const refreshToken = req.cookies?.[COOKIE_NAME] || req.body?.refresh_token;
   if (!refreshToken) {
     return res.status(HTTPSTATUS.UNAUTHORIZED).json({ message: "No refresh token provided" });
@@ -185,9 +185,9 @@ export const refresh = async (req: Request, res: Response): Promise<Response> =>
     logger.error(`refresh controller error: ${error.message}`);
     return res.status(HTTPSTATUS.UNAUTHORIZED).json({ message: "Invalid or expired refresh token" });
   }
-};
+});
 
-export const resendVerification = async (req: Request, res: Response): Promise<Response> => {
+export const resendVerification = asyncHandler(async (req: Request, res: Response) => {
   const { email } = req.body;
   if (!email || typeof email !== "string") {
     return res.status(HTTPSTATUS.UNAUTHORIZED).json({ success: false, message: "A valid email is required" });
@@ -204,9 +204,9 @@ export const resendVerification = async (req: Request, res: Response): Promise<R
     const statusCode = error.message === "User not found" ? 404 : 400;
     return res.status(statusCode).json({ success: false, message: error.message });
   }
-};
+});
 
-export const forgotPassword = async (req: Request, res: Response): Promise<Response> => {
+export const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
   const { email } = req.body;
   if (!email || typeof email !== "string") {
     return res.status(HTTPSTATUS.UNAUTHORIZED).json({ success: false, message: "A valid email is required" });
@@ -225,9 +225,9 @@ export const forgotPassword = async (req: Request, res: Response): Promise<Respo
     }
     return res.status(HTTPSTATUS.INTERNAL_SERVER_ERROR).json({ success: false, message: "Failed to send recovery email" });
   }
-};
+});
 
-export const resetPassword = async (req: Request, res: Response): Promise<Response> => {
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
   const { access_token, password } = req.body;
   const accessToken = access_token || extractBearerToken(req);
 
@@ -251,29 +251,23 @@ export const resetPassword = async (req: Request, res: Response): Promise<Respon
       message: error.message || "Failed to update password.",
     });
   }
-};
+});
 
-
-export const getMe = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const getMe = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
 
   if (!userId) {
-    res.status(HTTPSTATUS.UNAUTHORIZED).json({ message: "User not found" });
-    return;
+    return res.status(HTTPSTATUS.UNAUTHORIZED).json({ message: "User not found" });
   }
 
   try {
     const user = await AuthService.getUserById(userId);
-    res.status(HTTPSTATUS.OK).json({ success: true, data: user });
+    return res.status(HTTPSTATUS.OK).json({ success: true, data: user });
   } catch (error) {
     logger.error(`getMe controller error: ${(error as Error).message}`);
-
-    res.status(HTTPSTATUS.NOT_FOUND).json({
+    return res.status(HTTPSTATUS.NOT_FOUND).json({
       success: false,
       message: (error as Error).message,
     });
   }
-};
+});

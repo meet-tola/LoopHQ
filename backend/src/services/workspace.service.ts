@@ -33,6 +33,19 @@ export const createWorkspace = async ({ name, slug, userId }: CreateWorkspacePay
     await tx.workspaceMember.create({
       data: { workspaceId: workspace.id, userId, role: WorkspaceRole.OWNER },
     });
+    const defaultChannel = await tx.channel.create({
+      data: {
+        workspaceId: workspace.id,
+        name: "general",
+        type: "PUBLIC",
+      },
+    });
+    await tx.channelMember.create({
+      data: {
+        channelId: defaultChannel.id,
+        userId,
+      },
+    });
     logger.info(`Workspace '${name}' created and seeded with Owner user ${userId}`);
     return workspace;
   });
