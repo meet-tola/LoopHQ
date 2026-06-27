@@ -1,0 +1,27 @@
+const token = queryParams.get("token");
+
+if (token) {
+  if (isLoggedIn) {
+    // Authenticated users accept immediately
+    await api.post("/api/invites/accept", { token });
+    router.push("/dashboard");
+  } else {
+    // Unauthenticated users preserve state and route to register
+    sessionStorage.setItem("pending_invite_token", token);
+    router.push(`/auth/register?token=${token}`);
+  }
+}
+
+const handleSubmit = async (formData) => {
+  // Retrieve the token that survived the redirect
+  const inviteToken = sessionStorage.getItem("pending_invite_token") || queryParams.get("token");
+
+  const payload = {
+    ...formData,
+    inviteToken: inviteToken || null // Pass it along to your updated backend registration
+  };
+
+  await api.post("/api/auth/register", payload);
+  sessionStorage.removeItem("pending_invite_token"); // Clean up
+  router.push("/dashboard");
+};

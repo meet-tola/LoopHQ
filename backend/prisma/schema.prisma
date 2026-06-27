@@ -3,9 +3,30 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
+// ENUMS
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+}
+
+enum ChannelType {
+  PUBLIC
+  PRIVATE
+}
+
+enum ThreadStatus {
+  OPEN
+  RESOLVED
+}
+
+// USER & WORKSPACE MODELS
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -13,4 +34,222 @@ model User {
   password  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Relations
+  memberships     WorkspaceMember[]
+  messages        Message[]
+  reactions       Reaction[]
+  channelMembers  ChannelMember[]
+  aiAgentMemories AiAgentMemory[]
+}
+
+model Workspace {
+  id         String            @id @default(cuid())
+  name       String
+  slug       String            @unique
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  customerId String?           @unique
+  plan       String            @default("free")
+  
+  // Relations
+  members    WorkspaceMember[]
+  channels   Channel[]
+  aiAgents   AiAgent[]
+  invites    WorkspaceInvite[]
+}
+
+model WorkspaceInvite {
+  id          String    @id @default(cuid())
+  email       String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  token       String    @unique
+  invitedById String
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@unique([workspaceId, email])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Custom permissions matrix can be handled via JSON or a separate Permissions model.
+  // Given your requirements, a JSON block allows highly flexible dynamic team permissions.
+  permissions Json? // e.g., { "canCreateChannels": true, "canInvite": false }
+
+  @@unique([workspaceId, userId]) // A user can only be in a workspace once
+}
+
+// CHANNELS & LIVE ROOMS
+
+model Channel {
+  id          String      @id @default(cuid())
+  workspaceId String
+  name        String
+  type        ChannelType @default(PUBLIC)
+  aiSummary   String?     @db.Text
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members   ChannelMember[]
+  messages  Message[]
+  liveRoom  LiveRoom?
+
+  @@unique([workspaceId, name]) // Prevent duplicate channel names inside the same workspace
+}
+
+model ChannelMember {
+  id        String   @id @default(cuid())
+  channelId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  // Relations
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+}
+
+model LiveRoom {
+  id          String   @id @default(cuid())
+  channelId   String   @unique
+  isActive    Boolean  @default(false)
+  isRecording Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+}
+
+// MESSAGES, THREADS & DMs
+model Message {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channelId String?
+  dmGroupId String? // For Direct Messages
+
+  // Author can be a real User OR an AI Agent
+  userId    String?
+  aiAgentId String?
+
+  // Threading tracking
+  threadId String? // If present, this message belongs to a thread parented by another message
+
+  // Relations
+  channel Channel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  dmGroup DmGroup? @relation(fields: [dmGroupId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiAgent AiAgent? @relation(fields: [aiAgentId], references: [id], onDelete: Cascade)
+
+  // Thread Relations
+  thread   Thread? @relation("ThreadMessages", fields: [threadId], references: [id], onDelete: Cascade)
+  parentOf Thread? @relation("ThreadParent")
+
+  // General attachments and signals
+  files     File[]
+  reactions Reaction[]
+}
+
+model Thread {
+  id          String       @id @default(cuid())
+  parentMsgId String       @unique // Links back to the original root message
+  status      ThreadStatus @default(OPEN)
+  aiSummary   String?      @db.Text
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  parentMessage Message   @relation("ThreadParent", fields: [parentMsgId], references: [id], onDelete: Cascade)
+  replies       Message[] @relation("ThreadMessages")
+}
+
+model DmGroup {
+  id        String   @id @default(cuid())
+  isGroup   Boolean  @default(false) // false = 1:1 chat, true = Group DM
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  messages  Message[]
+  // Ideally, track DM participants via a simple list of userIds or a dedicated join table
+  memberIds String[] 
+}
+
+model Reaction {
+  id        String @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji]) 
+}
+
+// AI AGENTS & SLASH COMMANDS SYSTEM
+model AiAgent {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  name           String
+  avatarUrl      String?
+  instructions   String   @db.Text
+  prompt         String   @db.Text
+  slashCommand   String   @unique // e.g., "marketing", "engineering" to map "/marketing"
+  permissions    Json? // Scope of what the AI can read/write
+  connectedTools String[] // Array of tools strings e.g. ["jira", "linear", "github"]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  memories  AiAgentMemory[]
+}
+
+model AiAgentMemory {
+  id        String   @id @default(cuid())
+  aiAgentId String
+  userId    String? 
+  key       String // Context identifier 
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  aiAgent AiAgent @relation(fields: [aiAgentId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// SHARED UTILITIES
+model File {
+  id        String   @id @default(cuid())
+  messageId String
+  url       String // Storage bucket path
+  name      String
+  size      Int
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 }
