@@ -19,7 +19,7 @@ export interface AuthResult {
 
 export interface RegisterPayload {
     email: string;
-    username: string;
+    name: string;
     password?: string;
     inviteToken?: string;
 }
@@ -44,15 +44,15 @@ export const syncGoogleAuthUser = async (idToken: string): Promise<AuthResult> =
     let dbUser = await prisma.user.findUnique({ where: { id: user.id } });
 
     if (!dbUser) {
-        // Generate a fallback clean unique username if metadata doesn't have it
-        const baseUsername = user.user_metadata.name?.replace(/\s+/g, "").toLowerCase() || "user";
+        // Generate a fallback clean unique name if metadata doesn't have it
+        const basename = user.user_metadata.name?.replace(/\s+/g, "").toLowerCase() || "user";
         const uniqueSuffix = user.id.slice(-4);
 
         dbUser = await prisma.user.create({
             data: {
                 id: user.id,
                 email: user.email!,
-                username: `${baseUsername}_${uniqueSuffix}`,
+                name: `${basename}_${uniqueSuffix}`,
             },
         });
         logger.info(`New User provisioned via Google OAuth: ${user.email}`);
@@ -63,7 +63,7 @@ export const syncGoogleAuthUser = async (idToken: string): Promise<AuthResult> =
 
 
 // --- Registers a new user  ---
-export const registerUser = async ({ email, username, password, inviteToken }: RegisterPayload): Promise<Omit<AuthResult, "session">> => {
+export const registerUser = async ({ email, name, password, inviteToken }: RegisterPayload): Promise<Omit<AuthResult, "session">> => {
     // Check if an invite token was provided
     if (inviteToken) {
         const invite = await prisma.workspaceInvite.findUnique({ where: { token: inviteToken } });
@@ -99,7 +99,7 @@ export const registerUser = async ({ email, username, password, inviteToken }: R
                 data: {
                     id: user.id,
                     email,
-                    username
+                    name
                 }
             });
         }
@@ -318,7 +318,7 @@ export const getUserById = async (userId: string) => {
         select: {
             id: true,
             email: true,
-            username: true,
+            name: true,
             createdAt: true,
             memberships: {
                 select: {

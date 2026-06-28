@@ -6,10 +6,10 @@ export const registerSchema = z.object({
     .nonempty("Email is required")
     .email("Invalid email address"),
 
-  username: z
+  name: z
     .string()
-    .nonempty("username is required")
-    .min(6, "username must be at least 6 characters long"),
+    .nonempty("name is required")
+    .min(6, "name must be at least 6 characters long"),
 
   password: z
     .string()

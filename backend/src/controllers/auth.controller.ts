@@ -74,7 +74,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     const registerPayload = {
       email: parsed.data.email,
       password: parsed.data.password,
-      username: parsed.data.username,
+      name: parsed.data.name,
       inviteToken: parsed.data.inviteToken,
     };
 
