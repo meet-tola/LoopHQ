@@ -44,13 +44,16 @@ model User {
 }
 
 model Workspace {
-  id         String   @id @default(cuid())
-  name       String
-  slug       String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  customerId String?  @unique
-  plan       String   @default("free")
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  image       String?
+  inviteCode  String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  customerId  String?  @unique
+  plan        String   @default("free")
 
   // Relations
   members  WorkspaceMember[]
