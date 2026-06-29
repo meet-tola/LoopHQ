@@ -10,7 +10,7 @@ export const Env = {
   SUPABASE_ANON_KEY: getEnv("SUPABASE_ANON_KEY"),
   SUPABASE_SERVICE_ROLE_KEY: getEnv("SUPABASE_SERVICE_ROLE_KEY"),
 
-  FRONTEND_ORIGIN: getEnv("FRONTEND_ORIGIN", "http://localhost:5173"),
+  FRONTEND_ORIGIN: getEnv("FRONTEND_ORIGIN", "http://localhost:3000"),
 
   //mail
   EMAIL_USER: getEnv("EMAIL_USER"),

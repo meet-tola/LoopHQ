@@ -8,7 +8,7 @@ import { Env } from "./config/env.config";
 import { asyncHandler } from "./middlewares/asyncHandler.middleware";
 import { HTTPSTATUS } from "./config/http.config";
 import { errorHandler } from "./middlewares/errorHandler.middleware";
-// import { initializeSocket } from "./lib/socket";
+import { initializeSocket } from "./lib/socket";
 import routes from "./routes";
 import logger from "./utils/logger";
 
@@ -16,7 +16,7 @@ const app = express();
 const server = http.createServer(app);
 
 //socket
-// initializeSocket(server);
+initializeSocket(server);
 
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
