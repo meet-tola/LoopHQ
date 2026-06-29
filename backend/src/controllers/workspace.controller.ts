@@ -5,16 +5,17 @@ import logger from "../utils/logger";
 import { HTTPSTATUS } from "../config/http.config";
 import { asyncHandler } from "../middlewares/asyncHandler.middleware";
 
-interface CreateWorkspaceBody { name: string; slug: string; }
+interface CreateWorkspaceBody { name: string; slug: string; image?: string; }
 interface AddMemberBody { email: string; }
 interface UpdateRoleBody { targetUserId: string; role: WorkspaceRole; }
 interface UpdatePermissionsBody { targetUserId: string; permissions: Record<string, boolean>; }
 interface RemoveUserBody { targetUserId: string; }
 interface SendInviteBody { email: string; }
+interface JoinWithCodeBody { inviteCode: string; }
 
 export const createWorkspace = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.id;
-    const { name, slug } = req.body as CreateWorkspaceBody;
+    const { name, slug, image } = req.body as CreateWorkspaceBody;
 
     if (!userId) {
         return res.status(HTTPSTATUS.UNAUTHORIZED).json({ message: "User not found" });
@@ -24,11 +25,27 @@ export const createWorkspace = asyncHandler(async (req: Request, res: Response) 
     }
 
     try {
-        const workspace = await WorkspaceService.createWorkspace({ name, slug, userId });
+        const workspace = await WorkspaceService.createWorkspace({ name, slug, image, userId });
         return res.status(HTTPSTATUS.CREATED).json({ success: true, data: workspace });
     } catch (error) {
         logger.error(`createWorkspace controller error: ${(error as Error).message}`);
         return res.status(HTTPSTATUS.BAD_REQUEST).json({ success: false, message: (error as Error).message });
+    }
+});
+
+export const listWorkspace = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+        return res.status(HTTPSTATUS.UNAUTHORIZED).json({ message: "User not authenticated" });
+    }
+
+    try {
+        const workspaces = await WorkspaceService.getUserWorkspaces(userId);
+        return res.status(HTTPSTATUS.OK).json({ success: true, data: workspaces });
+    } catch (error) {
+        logger.error(`listWorkspace controller error: ${(error as Error).message}`);
+        return res.status(HTTPSTATUS.INTERNAL_SERVER_ERROR).json({ success: false, message: (error as Error).message });
     }
 });
 
@@ -77,7 +94,7 @@ export const verifyInvite = asyncHandler(async (req: Request, res: Response) => 
         const inviteDetails = await WorkspaceService.verifyInviteToken(token);
         return res.status(HTTPSTATUS.OK).json({
             success: true,
-            invite: { email: inviteDetails.email, workspaceName: inviteDetails.workspace.name },
+            invite: { email: inviteDetails.email, workspaceName: inviteDetails.workspace.name, workspaceSlug: inviteDetails.workspace.slug },
         });
     } catch (error) {
         return res.status(HTTPSTATUS.BAD_REQUEST).json({ success: false, message: (error as Error).message });
@@ -97,6 +114,40 @@ export const acceptInvite = asyncHandler(async (req: Request, res: Response) => 
         return res.status(HTTPSTATUS.OK).json({ success: true, message: "Successfully joined workspace.", data: membership });
     } catch (error) {
         return res.status(HTTPSTATUS.FORBIDDEN).json({ success: false, message: (error as Error).message });
+    }
+});
+
+export const createInviteCode = asyncHandler(async (req: Request, res: Response) => {
+    const workspaceId = req.params.workspaceId as string;
+    try {
+        const result = await WorkspaceService.generateWorkspaceInviteCode(workspaceId);
+        return res.status(HTTPSTATUS.OK).json({ 
+            success: true, 
+            message: "Invite code generated successfully.", 
+            data: result 
+        });
+    } catch (error) {
+        logger.error(`createInviteCode controller error: ${(error as Error).message}`);
+        return res.status(HTTPSTATUS.BAD_REQUEST).json({ success: false, message: (error as Error).message });
+    }
+});
+
+export const joinWithCode = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { inviteCode } = req.body as JoinWithCodeBody;
+
+    if (!inviteCode) {
+        return res.status(HTTPSTATUS.BAD_REQUEST).json({ message: "Invite code is required." });
+    }
+    try {
+        const membership = await WorkspaceService.joinWorkspaceWithCode(inviteCode, userId);
+        return res.status(HTTPSTATUS.OK).json({ 
+            success: true, 
+            message: "Successfully joined the workspace via code.", 
+            data: membership 
+        });
+    } catch (error) {
+        return res.status(HTTPSTATUS.BAD_REQUEST).json({ success: false, message: (error as Error).message });
     }
 });
 

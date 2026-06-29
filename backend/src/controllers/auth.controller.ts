@@ -131,8 +131,15 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     });
   }
 
+  const inviteToken = req.body?.inviteToken as string | undefined;
+
   try {
-    const { session, user, dbUser } = await AuthService.loginUser(parsed.data);
+    const { session, user, dbUser } = await AuthService.loginUser({
+      email: parsed.data.email,
+      password: parsed.data.password,
+      inviteToken
+    });
+
     setRefreshCookie(res, session.refresh_token);
 
     return res.status(HTTPSTATUS.OK).json({
@@ -142,7 +149,10 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       access_token: session.access_token,
     });
   } catch (error: any) {
-    if (error.message?.includes("Invalid login credentials")) {
+    if (error.message?.includes("different email")) {
+      return res.status(HTTPSTATUS.BAD_REQUEST).json({ success: false, message: error.message });
+    }
+    if (error.message?.includes("Invalid login credentials") || error.message?.includes("invalid_credentials")) {
       return res.status(HTTPSTATUS.UNAUTHORIZED).json({ success: false, message: "Invalid email or password" });
     }
     logger.error(`login controller error: ${error.message}`);
@@ -255,7 +265,6 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
 
 export const getMe = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
-
   if (!userId) {
     return res.status(HTTPSTATUS.UNAUTHORIZED).json({ message: "User not found" });
   }

@@ -190,11 +190,12 @@ export const verifyEmail = async (accessToken: string): Promise<AuthResult> => {
 };
 
 
-// --- Login user  ---
+// --- Login user ---
 export const loginUser = async ({
     email,
-    password
-}: Required<Pick<RegisterPayload, "email" | "password">>): Promise<AuthResult & { session: Session }> => {
+    password,
+    inviteToken
+}: Required<Pick<RegisterPayload, "email" | "password">> & { inviteToken?: string }): Promise<AuthResult & { session: Session }> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
@@ -210,6 +211,44 @@ export const loginUser = async ({
     if (!dbUser) {
         logger.error(`Orphaned Auth User Found. ID: ${data.user.id} has no corresponding database record.`);
         throw new Error("Database user record not found");
+    }
+
+    // Process Workspace Auto-Join if invite token is provided during login
+    if (inviteToken) {
+        try {
+            await prisma.$transaction(async (tx) => {
+                const invite = await tx.workspaceInvite.findUnique({ where: { token: inviteToken } });
+
+                if (invite && invite.expiresAt > new Date() && invite.email.toLowerCase() === data.user.email!.toLowerCase()) {
+
+                    // Link workspace membership
+                    await tx.workspaceMember.upsert({
+                        where: { workspaceId_userId: { workspaceId: invite.workspaceId, userId: data.user.id } },
+                        update: {},
+                        create: {
+                            workspaceId: invite.workspaceId,
+                            userId: data.user.id,
+                            role: WorkspaceRole.MEMBER,
+                        }
+                    });
+
+                    await tx.workspaceInvite.delete({ where: { token: inviteToken } });
+                    logger.info(`User ${data.user.id} auto-joined workspace ${invite.workspaceId} through login interception.`);
+                } else if (invite && invite.email.toLowerCase() !== data.user.email!.toLowerCase()) {
+                    throw new Error("This workspace invite was issued to a different email address.");
+                }
+            });
+
+            await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
+                user_metadata: { ...data.user.user_metadata, pending_invite_token: null }
+            });
+
+        } catch (inviteError: any) {
+            logger.error(`Failed auto-joining workspace during login execution: ${inviteError.message}`);
+            if (inviteError.message.includes("different email")) {
+                throw inviteError;
+            }
+        }
     }
 
     logger.info(`User logged in: ${email}`);

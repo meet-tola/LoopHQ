@@ -20,11 +20,12 @@ export interface WorkspacePermissionsPayload {
 export interface CreateWorkspacePayload {
   name: string;
   slug: string;
+  image?: string;
   userId: string;
 }
 
 // --- Create workspace ---
-export const createWorkspace = async ({ name, slug, userId }: CreateWorkspacePayload) => {
+export const createWorkspace = async ({ name, slug, image, userId }: CreateWorkspacePayload) => {
   const existingSlug = await prisma.workspace.findUnique({ where: { slug } });
   if (existingSlug) throw new Error("Workspace slug is already taken");
 
@@ -48,6 +49,26 @@ export const createWorkspace = async ({ name, slug, userId }: CreateWorkspacePay
     });
     logger.info(`Workspace '${name}' created and seeded with Owner user ${userId}`);
     return workspace;
+  });
+};
+
+// --- Lists all workspaces a specific user belongs to ---
+export const getUserWorkspaces = async (userId: string) => {
+  return prisma.workspace.findMany({
+    where: {
+      members: {
+        some: {
+          userId: userId,
+        },
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      image: true,
+      createdAt: true,
+    },
   });
 };
 
@@ -123,6 +144,48 @@ export const acceptWorkspaceInvite = async (token: string, userId: string) => {
     });
 
     await tx.workspaceInvite.delete({ where: { token } });
+    return newMember;
+  });
+};
+
+// --- Generate or replace a unique invite code for a workspace ---
+export const generateWorkspaceInviteCode = async (workspaceId: string) => {
+  const inviteCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+  return prisma.workspace.update({
+    where: { id: workspaceId },
+    data: { inviteCode },
+    select: { inviteCode: true },
+  });
+};
+
+// --- Join a workspace using a unique invite code ---
+export const joinWorkspaceWithCode = async (inviteCode: string, userId: string) => {
+  const workspace = await prisma.workspace.findUnique({
+    where: { inviteCode: inviteCode.toUpperCase() },
+  });
+
+  if (!workspace) throw new Error("Invalid invite code.");
+  const existingMember = await prisma.workspaceMember.findUnique({
+    where: { workspaceId_userId: { workspaceId: workspace.id, userId } },
+  });
+
+  if (existingMember) throw new Error("You are already a member of this workspace.");
+
+  return prisma.$transaction(async (tx) => {
+    const newMember = await tx.workspaceMember.create({
+      data: { workspaceId: workspace.id, userId, role: WorkspaceRole.MEMBER },
+    });
+
+    const generalChannel = await tx.channel.findFirst({
+      where: { workspaceId: workspace.id, name: "general" }
+    });
+
+    if (generalChannel) {
+      await tx.channelMember.create({
+        data: { channelId: generalChannel.id, userId }
+      }).catch(() => {}); 
+    }
+
     return newMember;
   });
 };
