@@ -39,10 +39,24 @@ export const createMessage = async ({
     await validateChannelMembership(channelId, userId);
   }
 
-  // If replying to a thread, verify the thread exists
+  let finalThreadId = threadId;
+
   if (threadId) {
-    const threadExists = await prisma.thread.findUnique({ where: { id: threadId } });
-    if (!threadExists) throw new Error("Parent thread not found.");
+    let threadExists = await prisma.thread.findUnique({ where: { id: threadId } });
+
+    if (!threadExists) {
+      const rootMessage = await prisma.message.findUnique({ where: { id: threadId } });
+      if (!rootMessage) throw new Error("Root message not found.");
+
+      threadExists = await prisma.thread.create({
+        data: {
+          id: threadId,
+          parentMsgId: threadId
+        },
+      });
+    }
+
+    finalThreadId = threadExists.id;
   }
 
   return prisma.message.create({
@@ -51,7 +65,7 @@ export const createMessage = async ({
       userId,
       channelId,
       dmGroupId,
-      threadId,
+      threadId: finalThreadId, // Tie it neatly to the thread table row
     },
     include: {
       user: {
@@ -96,12 +110,15 @@ export const createThread = async (parentMsgId: string) => {
   });
 };
 
-export const getThreadReplies = async (threadId: string) => {
-  return prisma.message.findMany({
+export const getThreadReplies = async (threadId: string, channelId: string, userId: string) => {
+  await validateChannelMembership(channelId, userId);
+
+  return await prisma.message.findMany({
     where: { threadId },
     orderBy: { createdAt: "asc" },
     include: {
       user: { select: { id: true, name: true } },
+      reactions: true,
     },
   });
 };

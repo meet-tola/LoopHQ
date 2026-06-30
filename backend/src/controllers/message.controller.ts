@@ -27,8 +27,6 @@ export const handleCreateMessage = asyncHandler(async (req: Request, res: Respon
             dmGroupId,
             threadId,
         });
-
-        // Real-time Event Hook
         if (channelId) {
             emitNewMessageToRoom(userId, `channel:${channelId}`, message);
         } else if (dmGroupId) {
@@ -65,6 +63,18 @@ export const handleStartThread = asyncHandler(async (req: Request, res: Response
     try {
         const thread = await MessageService.createThread(messageId);
         return res.status(HTTPSTATUS.CREATED).json({ success: true, data: thread });
+    } catch (error) {
+        return res.status(HTTPSTATUS.BAD_REQUEST).json({ success: false, message: (error as Error).message });
+    }
+});
+
+export const threadReplies = asyncHandler(async (req: Request, res: Response) => {
+    const { threadId, channelId } = req.params as { threadId: string, channelId: string };
+    const userId = req.user!.id;
+
+    try {
+        const replies = await MessageService.getThreadReplies(threadId, channelId, userId);
+        return res.status(HTTPSTATUS.OK).json({ success: true, data: replies });
     } catch (error) {
         return res.status(HTTPSTATUS.BAD_REQUEST).json({ success: false, message: (error as Error).message });
     }
