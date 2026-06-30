@@ -76,25 +76,25 @@ export interface CreateChannelPayload {
 
 export type Message = {
   id: string;
-  userId: string;       // Matches the direct database reference key
+  userId: string;      
   user: {
     id: string;
-    email?: string;     // Made optional since getChannelMessages projects only id and name
+    email?: string; 
     name: string;
   };
   content: string;
-  createdAt: string;    // Clean string timestamp parsing to fix the Grouping/Invalid Date bugs
+  createdAt: string;  
   channelId?: string;
-  dmGroupId?: string;   // Updated from dmId to match backend naming precisely
-  threadId?: string;    // Reference to target thread parent context
+  dmGroupId?: string; 
+  threadId?: string;  
   reactions: Reaction[];
-  files?: MessageFile[]; // Matches the integrated database file collection inclusions
+  files?: MessageFile[];
   parentOf?: Array<{
     id: string;
     _count: {
       replies: number;
     };
-  }>;                   // Maps the Prisma thread counting schema payload dynamically
+  }>;                
 };
 
 export interface CreateMessagePayload {

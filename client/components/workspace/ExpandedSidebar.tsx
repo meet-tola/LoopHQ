@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useUI } from '@/providers/UIProvider'
 import { useChannels, useDirectMessages } from '@/hooks/queries'
 import { useCreateChannel } from '@/hooks/queries/useChannels'
-import { MessageSquare, Plus, ChevronDown, ChevronRight, X, Hash, Lock } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, X, Hash, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -40,7 +40,6 @@ export function ExpandedSidebar({ workspaceId, workspaceName }: ExpandedSidebarP
 
   // API Data Hook integration
   const { data: channels = [], isLoading: channelsLoading } = useChannels(workspaceId)
-  console.log("Channel Data:", channels)
   const { data: dms = [] } = useDirectMessages(workspaceId)
   
   // React Query Mutation
@@ -60,7 +59,7 @@ export function ExpandedSidebar({ workspaceId, workspaceName }: ExpandedSidebarP
 
     createChannelMutation.mutate(
       {
-        name: newChannelName.toLowerCase().replace(/\s+/g, '-'), // URL safe naming formats
+        name: newChannelName.toLowerCase().replace(/\s+/g, '-'),
         type: newChannelType,
       },
       {

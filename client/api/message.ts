@@ -9,21 +9,16 @@ export const MessageService = {
     return response.data.data;
   },
 
-  // Create a new message
   async createMessage(payload: CreateMessagePayload): Promise<Message> {
     const response = await api.post<ApiResponse<Message>>('/messages', payload);
     return response.data.data;
   },
 
-  async getMessages(params: { channelId?: string; dmId?: string }): Promise<Message[]> {
-    const response = await api.get<Message[]>('/messages', { params });
-    return response.data;
+  async getThreadReplies(threadId: string, channelId: string): Promise<Message[]> {
+    const response = await api.get<ApiResponse<Message[]>>(`/messages/${channelId}/${threadId}`);
+    return response.data.data;
   },
 
-  async sendMessage(data: { content: string; channelId?: string; dmId?: string }): Promise<Message> {
-    const response = await api.post<Message>('/messages', data);
-    return response.data;
-  },
 
   async addReaction(messageId: string, emoji: string): Promise<{ messageId: string; emoji: string }> {
     const response = await api.post(`/messages/${messageId}/reactions`, { emoji });
@@ -32,11 +27,6 @@ export const MessageService = {
 
   async searchMessages(workspaceId: string, query: string): Promise<Message[]> {
     const response = await api.get<Message[]>(`/workspaces/${workspaceId}/search`, { params: { query } });
-    return response.data;
-  },
-
-  async getThreadMessages(parentMessageId: string): Promise<Message[]> {
-    const response = await api.get<Message[]>(`/messages/${parentMessageId}/thread`);
     return response.data;
   },
 

@@ -35,8 +35,6 @@ export function useSocketMessages(channelId: string) {
         socket.on('message:new', (incomingMessage: Message) => {
             queryClient.setQueryData(['messages', channelId], (oldMessages: Message[] | undefined) => {
                 if (!oldMessages) return [incomingMessage];
-
-                // Prevent duplicate appending anomalies
                 if (oldMessages.some((msg) => msg.id === incomingMessage.id)) return oldMessages;
 
                 return [...oldMessages, incomingMessage];
