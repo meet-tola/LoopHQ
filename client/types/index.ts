@@ -5,7 +5,7 @@ export type User = {
   id: string;
   name: string;
   email: string;
-  avatar_url?: string | null;
+  avatarUrl?: string | null;
   status: 'online' | 'away' | 'offline';
   status_message?: string | null;
   created_at: string;
@@ -74,35 +74,67 @@ export interface CreateChannelPayload {
   type: ChannelType;
 }
 
-export type Message = {
-  id: string;
-  userId: string;      
-  user: {
-    id: string;
-    email?: string; 
-    name: string;
-  };
-  content: string;
-  createdAt: string;  
-  channelId?: string;
-  dmGroupId?: string; 
-  threadId?: string;  
-  reactions: Reaction[];
-  files?: MessageFile[];
-  parentOf?: Array<{
-    id: string;
-    _count: {
-      replies: number;
-    };
-  }>;                
-};
-
 export interface CreateMessagePayload {
   content: string;
   channelId?: string;
   dmGroupId?: string;
   threadId?: string;
 }
+
+export type Message = {
+  id: string;
+  userId: string;
+  content: string;
+  createdAt: string;
+  channelId?: string;
+  dmGroupId?: string;
+  threadId?: string;
+  pinned?: string;
+  user: {
+    id: string;
+    email?: string;
+    avatarUrl?: string;
+    name: string;
+  };
+  aiAgent?: {
+    id: string;
+    name: string | null;
+    avatarUrl: string | null;
+  } | null;
+  reactions: Reaction[];
+  files?: MessageFile[];
+  parentOf?: Thread[];
+};
+
+export type ThreadParticipant = {
+  id: string;
+  name: string | null;
+  avatarUrl: string | null;
+};
+
+
+export type Thread = {
+  id: string;
+  parentMsgId: string;
+  messages?: Message[];
+  user: {
+    id: string;
+    email?: string;
+    avatarUrl?: string;
+    name: string;
+  };
+  content: string;
+  status: "OPEN" | "RESOLVED";
+  aiSummary?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  replies?: Message[];
+
+  replyCount: number;
+  lastReplyAt: string | null;
+  participants: ThreadParticipant[];
+};
+
 export type Reaction = {
   id: string;
   emoji: string;
@@ -125,13 +157,6 @@ export type DirectMessage = {
   participants: User[]
   lastMessage?: Message
   unreadCount: number
-}
-
-export type Thread = {
-  id: string
-  parentMessageId: string
-  messages: Message[]
-  participantCount: number
 }
 
 export type TypingIndicator = {

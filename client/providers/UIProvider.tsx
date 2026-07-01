@@ -48,9 +48,6 @@ interface UIContextType {
   setShowSettings: (show: boolean) => void
   toggleSettings: () => void
   
-  // Theme
-  theme: 'light' | 'dark'
-  setTheme: (theme: 'light' | 'dark') => void
 }
 
 const UIContext = createContext<UIContextType | undefined>(undefined)
@@ -67,7 +64,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
 
   const toggleExpandedSidebar = () => setExpandedSidebarOpen(!expandedSidebarOpen)
   const toggleRightSidebar = () => setRightSidebarOpen(!rightSidebarOpen)
@@ -101,8 +97,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     showSettings,
     setShowSettings,
     toggleSettings,
-    theme,
-    setTheme,
   }
 
   return (

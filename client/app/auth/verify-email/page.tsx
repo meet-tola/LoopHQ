@@ -20,12 +20,21 @@ export default function VerifyEmailPage() {
   const verificationStarted = useRef(false);
 
   useEffect(() => {
-    const token = searchParams.get("access_token");
+    let token = searchParams.get("access_token");
+
+    if (!token && typeof window !== "undefined") {
+      const hash = window.location.hash;
+      if (hash) {
+        const params = new URLSearchParams(hash.replace("#", "?"));
+        token = params.get("access_token");
+      }
+    }
 
     if (!token) {
       setStatus("error");
       return;
     }
+
     const accessToken = token;
     if (verificationStarted.current) return;
     verificationStarted.current = true;
@@ -115,7 +124,6 @@ export default function VerifyEmailPage() {
               </p>
             </div>
 
-            {/* Interactive Recovery Action Block */}
             <div className="w-full pt-4 border-t border-border/60 space-y-3 text-left">
               <label className="text-xs font-semibold text-foreground block pl-0.5">
                 Request a New Link

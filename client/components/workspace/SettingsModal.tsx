@@ -1,11 +1,19 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { useTheme } from 'next-themes'
 import { useUI } from '@/providers/UIProvider'
 import { X, Moon, Sun, Bell, Lock, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export function SettingsModal() {
-  const { showSettings, setShowSettings, theme, setTheme } = useUI()
+  const { showSettings, setShowSettings } = useUI()
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   if (!showSettings) return null
 
@@ -35,42 +43,48 @@ export function SettingsModal() {
           {/* Theme Section */}
           <div>
             <h3 className="font-semibold mb-3 flex items-center gap-2">
-              {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              {mounted && theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
               Appearance
             </h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => setTheme('light')}
-                className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
-                  theme === 'light'
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border/40 hover:border-border'
-                }`}
-              >
-                <Sun className="w-4 h-4" />
-                <div className="flex-1 text-left">
-                  <div className="font-medium text-sm">Light Theme</div>
-                  <div className="text-xs text-muted-foreground">Clean, bright interface</div>
-                </div>
-                {theme === 'light' && <div className="w-3 h-3 rounded-full bg-primary" />}
-              </button>
+            
+            {/* Skeleton / Placeholder while mounting to prevent layout shifts */}
+            {!mounted ? (
+              <div className="h-29 w-full rounded-lg bg-muted/20 animate-pulse border border-border/40" />
+            ) : (
+              <div className="space-y-2">
+                <button
+                  onClick={() => setTheme('light')}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
+                    theme === 'light'
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border/40 hover:border-border'
+                  }`}
+                >
+                  <Sun className="w-4 h-4" />
+                  <div className="flex-1 text-left">
+                    <div className="font-medium text-sm">Light Theme</div>
+                    <div className="text-xs text-muted-foreground">Clean, bright interface</div>
+                  </div>
+                  {theme === 'light' && <div className="w-3 h-3 rounded-full bg-primary" />}
+                </button>
 
-              <button
-                onClick={() => setTheme('dark')}
-                className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
-                  theme === 'dark'
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border/40 hover:border-border'
-                }`}
-              >
-                <Moon className="w-4 h-4" />
-                <div className="flex-1 text-left">
-                  <div className="font-medium text-sm">Dark Theme</div>
-                  <div className="text-xs text-muted-foreground">Easy on the eyes</div>
-                </div>
-                {theme === 'dark' && <div className="w-3 h-3 rounded-full bg-primary" />}
-              </button>
-            </div>
+                <button
+                  onClick={() => setTheme('dark')}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
+                    theme === 'dark'
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border/40 hover:border-border'
+                  }`}
+                >
+                  <Moon className="w-4 h-4" />
+                  <div className="flex-1 text-left">
+                    <div className="font-medium text-sm">Dark Theme</div>
+                    <div className="text-xs text-muted-foreground">Easy on the eyes</div>
+                  </div>
+                  {theme === 'dark' && <div className="w-3 h-3 rounded-full bg-primary" />}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Notifications Section */}
