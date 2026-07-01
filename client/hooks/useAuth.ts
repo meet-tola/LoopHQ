@@ -44,9 +44,8 @@ export function useAuth() {
 
     if (isError) {
       clearAuth();
-      router.replace("/auth/login");
     }
-  }, [data, isError]);
+  }, [data, isError, setAuth, clearAuth]);
 
   return {
     user,

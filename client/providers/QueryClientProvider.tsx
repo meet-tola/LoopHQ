@@ -1,21 +1,25 @@
-'use client'
+"use client";
 
-import { QueryClient, QueryClientProvider as TanstackQueryClientProvider } from '@tanstack/react-query'
-import { ReactNode } from 'react'
+import React from "react";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
-    },
-  },
-})
+const queryClient = new QueryClient();
 
-export function QueryClientProvider({ children }: { children: ReactNode }) {
+const clientStorage = typeof window !== "undefined" ? window.localStorage : undefined;
+
+const persister = createSyncStoragePersister({
+  storage: clientStorage,
+});
+
+export function QueryClientProvider({ children }: { children: React.ReactNode }) {
   return (
-    <TanstackQueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister }}
+    >
       {children}
-    </TanstackQueryClientProvider>
-  )
+    </PersistQueryClientProvider>
+  );
 }
