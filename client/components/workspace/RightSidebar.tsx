@@ -6,7 +6,7 @@ import {
   useSendMessage,
   useThreadMessages,
 } from "@/hooks/queries/useMessages";
-import { X, Send } from "lucide-react";
+import { X, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -29,14 +29,19 @@ export function RightSidebar({ workspaceId }: RightSidebarProps) {
 
   const [threadReplyInput, setThreadReplyInput] = useState("");
 
-  const { data: threadReplies = [] } = useThreadMessages(
+  // Fetching individual thread scope queries with loading statuses
+  const { data: threadResponse, isLoading: threadLoading } = useThreadMessages(
     selectedThreadId || "",
     selectedChannelId || "",
   );
 
+  // Safely mapping data out using your internal thread response schema structure
+  const threadReplies = threadResponse?.replies || [];
+
   const { data: allChannelMessages = [] } = useMessages(
     selectedChannelId || "",
   );
+  
   const parentMessage = allChannelMessages.find(
     (m) => m.id === selectedThreadId,
   );
@@ -92,9 +97,11 @@ export function RightSidebar({ workspaceId }: RightSidebarProps) {
       >
         {/* Header */}
         <div className="border-b border-border/40 p-4 flex items-center justify-between gap-2 shrink-0">
-          <h3 className="font-semibold text-sm">
-            {selectedThreadId ? "Thread Context" : "Member Profile"}
-          </h3>
+          <div>
+            <h3 className="font-semibold text-sm">
+              {selectedThreadId ? "Thread Replies" : "Member Profile"}
+            </h3>
+          </div>
           <button
             onClick={() => {
               setRightSidebarOpen(false);
@@ -132,8 +139,17 @@ export function RightSidebar({ workspaceId }: RightSidebarProps) {
                   <div className="flex-1 h-px bg-border/40" />
                 </div>
 
-                {/* Nested Thread List Container */}
-                {threadReplies.length === 0 ? (
+                {/* Nested Thread List Container with Loading Skeletons */}
+                {threadLoading ? (
+                  <div className="space-y-3 animate-pulse">
+                    {[1, 2, 3].map((n) => (
+                      <div key={n} className="p-3 rounded-md bg-muted/40 border border-border/10 space-y-2">
+                        <div className="h-3 w-20 bg-muted rounded" />
+                        <div className="h-3.5 w-full bg-muted rounded" />
+                      </div>
+                    ))}
+                  </div>
+                ) : threadReplies.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-32 text-center text-muted-foreground">
                     <p className="text-xs">No responses yet</p>
                   </div>
@@ -143,23 +159,34 @@ export function RightSidebar({ workspaceId }: RightSidebarProps) {
                       const msgTime = msg.createdAt
                         ? new Date(msg.createdAt)
                         : new Date();
+                      const isTempMessage = msg.id.toString().startsWith("temp-");
+                      
                       return (
                         <div
                           key={msg.id}
-                          className="p-3 rounded-md bg-secondary/20 border border-border/10"
+                          className={cn(
+                            "p-3 rounded-md bg-secondary/20 border border-border/10 transition-opacity duration-150",
+                            isTempMessage && "opacity-60 bg-primary/5 border-primary/10"
+                          )}
                         >
                           <div className="flex items-baseline gap-2 mb-1">
                             <span className="font-semibold text-xs">
                               {msg.user?.name}
                             </span>
                             <span className="text-[10px] text-muted-foreground">
-                              {msgTime.toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                              {isTempMessage ? (
+                                <span className="text-primary font-medium flex items-center gap-1 animate-pulse">
+                                  Sending...
+                                </span>
+                              ) : (
+                                msgTime.toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                              )}
                             </span>
                           </div>
-                          <p className="text-xs text-foreground leading-relaxed">
+                          <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap wrap-break-word">
                             {msg.content}
                           </p>
                         </div>
