@@ -161,7 +161,7 @@ export const generateWorkspaceInviteCode = async (workspaceId: string) => {
 // --- Join a workspace using a unique invite code ---
 export const joinWorkspaceWithCode = async (inviteCode: string, userId: string) => {
   const workspace = await prisma.workspace.findUnique({
-    where: { inviteCode: inviteCode.toUpperCase() },
+    where: { inviteCode: inviteCode.toUpperCase() }
   });
 
   if (!workspace) throw new Error("Invalid invite code.");
@@ -172,22 +172,26 @@ export const joinWorkspaceWithCode = async (inviteCode: string, userId: string) 
   if (existingMember) throw new Error("You are already a member of this workspace.");
 
   return prisma.$transaction(async (tx) => {
-    const newMember = await tx.workspaceMember.create({
-      data: { workspaceId: workspace.id, userId, role: WorkspaceRole.MEMBER },
-    });
-
-    const generalChannel = await tx.channel.findFirst({
-      where: { workspaceId: workspace.id, name: "general" }
-    });
-
-    if (generalChannel) {
-      await tx.channelMember.create({
-        data: { channelId: generalChannel.id, userId }
-      }).catch(() => {}); 
-    }
-
-    return newMember;
+  const newMember = await tx.workspaceMember.create({
+    data: { 
+      workspaceId: workspace.id, 
+      userId, 
+      role: WorkspaceRole.MEMBER 
+    },
   });
+
+  const generalChannel = await tx.channel.findFirst({
+    where: { workspaceId: workspace.id, name: "general" }
+  });
+
+  if (generalChannel) {
+    await tx.channelMember.create({
+      data: { channelId: generalChannel.id, userId }
+    }).catch(() => { });
+  }
+
+  return newMember;
+});
 };
 
 // --- Lists all members within a given workspace ---

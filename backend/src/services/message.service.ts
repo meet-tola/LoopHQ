@@ -93,12 +93,57 @@ export const getChannelMessages = async (channelId: string, userId: string, limi
       reactions: true,
       files: true,
       parentOf: {
-        select: { id: true, _count: { select: { replies: true } } },
-      },
-    },
+        include: {
+          replies: {
+            orderBy: { createdAt: "asc" },
+            include: {
+              user: { select: { id: true, name: true, avatarUrl: true } },
+              aiAgent: { select: { id: true, name: true, avatarUrl: true } },
+            }
+          }
+        }
+      }
+    }
   });
 
-  return messages.reverse();
+  return messages.map((message) => {
+    const threadRelation = message.parentOf;
+
+    // If this message doesn't parent a thread, return it clean
+    if (!threadRelation) return { ...message, parentOf: null };
+
+    const replies = threadRelation.replies || [];
+
+    // Extract thread participants
+    const participantsMap = new Map();
+    replies.forEach((reply) => {
+      const actor = reply.user || reply.aiAgent;
+      if (actor && !participantsMap.has(actor.id)) {
+        participantsMap.set(actor.id, {
+          id: actor.id,
+          name: actor.name,
+          avatarUrl: actor.avatarUrl,
+        });
+      }
+    });
+
+    return {
+      ...message,
+      parentOf: [
+        {
+          id: threadRelation.id,
+          parentMsgId: threadRelation.parentMsgId,
+          status: threadRelation.status,
+          aiSummary: threadRelation.aiSummary,
+          createdAt: threadRelation.createdAt,
+          updatedAt: threadRelation.updatedAt,
+          replyCount: replies.length,
+          lastReplyAt: replies.length > 0 ? replies[replies.length - 1].createdAt : null,
+          participants: Array.from(participantsMap.values()),
+        }
+      ]
+    };
+  });
 };
 
 export const createThread = async (parentMsgId: string) => {
@@ -113,12 +158,45 @@ export const createThread = async (parentMsgId: string) => {
 export const getThreadReplies = async (threadId: string, channelId: string, userId: string) => {
   await validateChannelMembership(channelId, userId);
 
-  return await prisma.message.findMany({
+  const replies = await prisma.message.findMany({
     where: { threadId },
     orderBy: { createdAt: "asc" },
     include: {
-      user: { select: { id: true, name: true } },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          avatarUrl: true
+        }
+      },
+      aiAgent: {
+        select: {
+          id: true,
+          name: true,
+          avatarUrl: true
+        }
+      },
       reactions: true,
     },
   });
+
+  const participantsMap = new Map<string, { id: string; name: string | null; avatarUrl: string | null }>();
+
+  replies.forEach((reply) => {
+    const author = reply.user || reply.aiAgent;
+    if (author && !participantsMap.has(author.id)) {
+      participantsMap.set(author.id, {
+        id: author.id,
+        name: author.name,
+        avatarUrl: author.avatarUrl,
+      });
+    }
+  });
+
+  return {
+    replies,
+    replyCount: replies.length,
+    lastReplyAt: replies.length > 0 ? replies[replies.length - 1].createdAt : null,
+    participants: Array.from(participantsMap.values()),
+  };
 };

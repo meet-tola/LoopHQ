@@ -73,8 +73,8 @@ export const threadReplies = asyncHandler(async (req: Request, res: Response) =>
     const userId = req.user!.id;
 
     try {
-        const replies = await MessageService.getThreadReplies(threadId, channelId, userId);
-        return res.status(HTTPSTATUS.OK).json({ success: true, data: replies });
+        const threadData = await MessageService.getThreadReplies(threadId, channelId, userId);
+        return res.status(HTTPSTATUS.OK).json({ success: true, data: threadData });
     } catch (error) {
         return res.status(HTTPSTATUS.BAD_REQUEST).json({ success: false, message: (error as Error).message });
     }

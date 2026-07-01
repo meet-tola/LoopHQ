@@ -7,13 +7,12 @@ dotenv.config();
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
+  port: 465,
+  secure: true,
   auth: {
-    user: Env.EMAIL_USER!,
-    pass: Env.EMAIL_APP_PASSWORD!,
+    user: Env.EMAIL_USER,
+    pass: Env.EMAIL_APP_PASSWORD,
   },
-  connectionTimeout: 10000,
 });
 
 interface VerificationEmailParams {
