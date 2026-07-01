@@ -1,5 +1,5 @@
 import { api } from '../lib/axios';
-import { ApiResponse, CreateMessagePayload, Message } from '@/types'
+import { ApiResponse, CreateMessagePayload, Message, Thread } from '@/types'
 
 export const MessageService = {
   async getChannelMessages(channelId: string, limit?: number, cursor?: string): Promise<Message[]> {
@@ -14,11 +14,10 @@ export const MessageService = {
     return response.data.data;
   },
 
-  async getThreadReplies(threadId: string, channelId: string): Promise<Message[]> {
-    const response = await api.get<ApiResponse<Message[]>>(`/messages/${channelId}/${threadId}`);
+  async getThreadReplies(threadId: string, channelId: string): Promise<Thread> {
+    const response = await api.get<ApiResponse<Thread>>(`/messages/${channelId}/${threadId}`);
     return response.data.data;
   },
-
 
   async addReaction(messageId: string, emoji: string): Promise<{ messageId: string; emoji: string }> {
     const response = await api.post(`/messages/${messageId}/reactions`, { emoji });

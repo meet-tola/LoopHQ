@@ -15,7 +15,7 @@ export const WorkspaceService = {
   },
 
   // POST /workspaces/join/code
-  async joinWithCode(inviteCode: string): Promise<{ id: string; workspaceId: string; role: string }> {
+  async joinWithCode(inviteCode: string): Promise<{ id: string; workspaceId: string; role: string; name: string; slug: string; }> {
     const response = await api.post<ApiResponse<any>>('/workspaces/join/code', { inviteCode });
     return response.data.data;
   },
