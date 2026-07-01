@@ -17,10 +17,8 @@ export default function AuthGuard({ children, variant }: AuthGuardProps) {
   const shouldFetchWorkspaces = isAuthenticated && variant === "guest";
   const { data: workspaces, isLoading: isWorkspaceLoading } = useWorkspaces(shouldFetchWorkspaces);
 
-  const isLoading = isAuthLoading || (shouldFetchWorkspaces && isWorkspaceLoading);
-
   useEffect(() => {
-    if (isLoading) return;
+    if (isAuthLoading) return;
 
     if (variant === "protected" && !isAuthenticated) {
       router.replace("/auth/login");
@@ -28,15 +26,17 @@ export default function AuthGuard({ children, variant }: AuthGuardProps) {
     }
 
     if (variant === "guest" && isAuthenticated) {
+      if (isWorkspaceLoading) return;
+
       if (workspaces && workspaces.length > 0) {
-        router.replace(`/workspace/${workspaces[0].id}`);
+        router.replace(`/workspace/${workspaces[0].slug}`);
       } else {
         router.replace("/workspace");
       }
     }
-  }, [isAuthenticated, workspaces, isLoading, variant, router]);
+  }, [isAuthenticated, isAuthLoading, isWorkspaceLoading, variant, router, workspaces]);
 
-  if (isLoading) {
+  if (isAuthLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground animate-pulse text-sm font-medium">
         Loading authentication state...

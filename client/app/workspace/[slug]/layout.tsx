@@ -23,6 +23,7 @@ export default function WorkspaceLayout({
   const { data: workspaces, isLoading } = useWorkspaces(true);
   const { isLoading: authLoading } = useAuth();
   const currentWorkspace = workspaces?.find((w) => w.slug === slug);
+  console.log("currentWorkspace", currentWorkspace)
 
   if (!isLoading && !authLoading && !currentWorkspace) {
     return (
